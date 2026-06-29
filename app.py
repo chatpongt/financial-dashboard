@@ -22,13 +22,18 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+def _read_raw(uploaded_file) -> pd.DataFrame:
+    name = uploaded_file.name.lower()
+    if name.endswith(('.xlsx', '.xls')):
+        return pd.read_excel(uploaded_file, header=None)
+    return pd.read_csv(uploaded_file, header=None)
+
+
 # --- ฟังก์ชันทำความสะอาดและโหลดข้อมูล ---
 def clean_and_load(uploaded_file):
     if uploaded_file is not None:
         try:
-            # อ่านไฟล์ CSV โดยข้ามบรรทัดที่ไม่จำเป็น (Header ขยะ)
-            # เราจะค้นหาบรรทัดที่มีคำว่า "Period End Date" เพื่อใช้เป็น Header จริง
-            df_raw = pd.read_csv(uploaded_file)
+            df_raw = _read_raw(uploaded_file)
             
             header_row_index = -1
             for i, row in df_raw.iterrows():
@@ -38,8 +43,11 @@ def clean_and_load(uploaded_file):
                     break
             
             if header_row_index != -1:
-                # ตั้งค่า Header ใหม่
-                df = pd.read_csv(uploaded_file, header=header_row_index+1)
+                name = uploaded_file.name.lower()
+                if name.endswith(('.xlsx', '.xls')):
+                    df = pd.read_excel(uploaded_file, header=header_row_index + 1)
+                else:
+                    df = pd.read_csv(uploaded_file, header=header_row_index + 1)
                 
                 # เปลี่ยนชื่อคอลัมน์แรกเป็น 'Item'
                 df.columns.values[0] = 'Item'
@@ -65,17 +73,18 @@ def clean_and_load(uploaded_file):
     return None
 
 # --- ส่วน Header ของ Dashboard ---
+company_name = st.sidebar.text_input("ชื่อบริษัท / Ticker", value="Neo Corporate PCL")
 st.title("📊 Financial Performance Dashboard")
-st.markdown("ระบบติดตามผลประกอบการหุ้น: **Neo Corporate PCL** (และสามารถใช้อัปเดตกับหุ้นตัวอื่นที่มี format เดียวกัน)")
+st.markdown(f"ระบบติดตามผลประกอบการ: **{company_name}**")
 
 # --- ส่วน Upload ไฟล์ (Sidebar) ---
 with st.sidebar:
     st.header("📂 Data Input Zone")
-    st.info("อัปโหลดไฟล์ CSV เพื่ออัปเดตข้อมูล (รองรับไฟล์ใหม่ในอนาคต)")
+    st.info("อัปโหลด CSV หรือ XLSX (format LSEG/Excel export)")
     
-    file_income = st.file_uploader("1. Income Statement (งบกำไรขาดทุน)", type=['csv'])
-    file_balance = st.file_uploader("2. Balance Sheet (งบดุล)", type=['csv'])
-    file_cashflow = st.file_uploader("3. Cash Flow (งบกระแสเงินสด)", type=['csv'])
+    file_income = st.file_uploader("1. Income Statement (งบกำไรขาดทุน)", type=['csv', 'xlsx', 'xls'])
+    file_balance = st.file_uploader("2. Balance Sheet (งบดุล)", type=['csv', 'xlsx', 'xls'])
+    file_cashflow = st.file_uploader("3. Cash Flow (งบกระแสเงินสด)", type=['csv', 'xlsx', 'xls'])
 
 # --- Main Logic ---
 if file_income and file_balance and file_cashflow:
